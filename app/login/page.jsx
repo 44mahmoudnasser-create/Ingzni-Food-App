@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { User, Phone, Mail, Lock, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // لو المستخدم كان بيحاول يعمل حاجة معينة (زي إتمام الطلب) وتحوّل هنا
+  // عشان يسجل دخول، بعد النجاح هنرجّعه لنفس الصفحة اللي كان رايحلها
+  const redirectTo = searchParams.get("redirect") || "/";
+
   const [mode, setMode] = useState("login"); // login | signup
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -76,7 +81,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    router.push(redirectTo);
   };
 
   return (

@@ -15,7 +15,7 @@ export default function HomePage() {
   const router = useRouter();
   const cart = useCart();
 
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [restaurants, setRestaurants] = useState([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [query, setQuery] = useState("");
@@ -26,24 +26,21 @@ export default function HomePage() {
   const [loadingMenu, setLoadingMenu] = useState(false);
 
   // -------------------------------------------------
-  // 1) التأكد إن فيه مستخدم مسجل دخول، لو مفيش رجّعه لـ /login
+  // 1) نتأكد لو فيه مستخدم مسجل دخول (من غير ما نحوّله لصفحة اللوجين).
+  //    الصفحة الرئيسية بقت متاحة للكل حتى من غير تسجيل دخول، وهنستخدم
+  //    isLoggedIn بس عشان نعرف نوجّه المستخدم صح لما يدوس "إتمام الطلب"
+  //    أو أيقونة البروفايل.
   // -------------------------------------------------
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.replace("/login");
-      } else {
-        setCheckingAuth(false);
-      }
+      setIsLoggedIn(!!data.user);
     });
-  }, [router]);
+  }, []);
 
   // -------------------------------------------------
-  // 2) جلب المطاعم النشطة من Supabase
+  // 2) جلب المطاعم النشطة من Supabase (بدون أي شرط على تسجيل الدخول)
   // -------------------------------------------------
   useEffect(() => {
-    if (checkingAuth) return;
-
     const loadRestaurants = async () => {
       setLoadingRestaurants(true);
       const { data, error } = await supabase
@@ -57,7 +54,7 @@ export default function HomePage() {
     };
 
     loadRestaurants();
-  }, [checkingAuth]);
+  }, []);
 
   // -------------------------------------------------
   // فلترة محلية بالبحث + التصنيفات (تقدر تحولها لاستعلام supabase
@@ -93,8 +90,6 @@ export default function HomePage() {
     if (!error) setMenuItems(data || []);
     setLoadingMenu(false);
   };
-
-  if (checkingAuth) return null;
 
   return (
     <div className="min-h-screen">
@@ -188,7 +183,15 @@ export default function HomePage() {
         </main>
 
         {/* الكارت الجانبي */}
-        <CartPanel onCheckout={() => router.push("/checkout")} />
+        <CartPanel
+          onCheckout={() => {
+            if (!isLoggedIn) {
+              router.push("/login?redirect=/checkout");
+            } else {
+              router.push("/checkout");
+            }
+          }}
+        />
       </div>
 
       {/* مودال المنيو */}
