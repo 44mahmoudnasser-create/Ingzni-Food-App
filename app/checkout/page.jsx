@@ -130,14 +130,13 @@ export default function CheckoutPage() {
   // لينك جاهز يفتح خرائط جوجل برحلة واحدة: كل المطاعم بالترتيب ثم العميل.
   // لو عندنا ترتيب أمثل من Google Directions (route.waypointOrder) بنستخدمه،
   // غير كده اللينك بيمشي بالترتيب اللي المطاعم مضافة بيه في السلة.
-  const mapsUrl = hasAllCoords
-    ? buildGoogleMapsDirectionsUrl(
-        restaurantsCoords,
-        { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) },
-        route?.waypointOrder
-      )
-    : null;
-
+ const mapsUrl = hasAllCoords
+  ? buildGoogleMapsDirectionsUrl(
+      restaurantsCoords,
+      { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) },
+      route?.restaurantOrder   // ✅ بدل route?.waypointOrder
+    )
+  : null;
   // -------------------------------------------------------------
   // كل ما يتغير العنوان المختار، نطلب مسار التوصيل الحقيقي من جوجل
   // عن طريق الـ API route بتاعنا (/api/delivery-route)، مش من المتصفح
@@ -245,7 +244,7 @@ export default function CheckoutPage() {
         // الأوردر ونقدر نعرضه بعدين (مسافة، خط المسار، ترتيب المطاعم)
         route_distance_km: route ? Number(route.distanceKm) : null,
         route_polyline: route?.overviewPolyline || null,
-        route_waypoint_order: route?.waypointOrder || null,
+route_waypoint_order: route?.restaurantOrder || null,   // ✅ بدل route?.waypointOrder
         route_legs: route?.legs || null,
         route_maps_url: mapsUrl,
         status: "Pending",
