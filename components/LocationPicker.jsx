@@ -18,9 +18,20 @@ export default function LocationPicker({ lat, lng, onChange }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    let map;
+    let cancelled = false;
 
     import("leaflet").then((L) => {
+      // لو الـ effect اتلغى (اتعمل cleanup) قبل ما الـ import يخلص، منعملش
+      // خريطة أصلًا
+      if (cancelled) return;
+
+      // حماية من مشكلة "Map container is already initialized": بتحصل
+      // في وضع التطوير (React StrictMode) لأن الـ effect بيتنفذ مرتين،
+      // فبيفضل أثر خريطة قديمة على نفس الـ <div>. بنمسح الأثر ده الأول.
+      if (containerRef.current && containerRef.current._leaflet_id) {
+        containerRef.current._leaflet_id = null;
+      }
+
       // إصلاح مشكلة شائعة في Leaflet مع Webpack/Next.js: أيقونة الدبوس الافتراضية
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -32,7 +43,7 @@ export default function LocationPicker({ lat, lng, onChange }) {
       const startLat = lat || CAIRO_CENTER.lat;
       const startLng = lng || CAIRO_CENTER.lng;
 
-      map = L.map(containerRef.current).setView([startLat, startLng], 14);
+      const map = L.map(containerRef.current).setView([startLat, startLng], 14);
       mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -56,8 +67,18 @@ export default function LocationPicker({ lat, lng, onChange }) {
       setReady(true);
     });
 
+    // الـ cleanup بيستخدم mapRef.current (مش متغير محلي عادي) عشان نضمن
+    // إننا شايفين آخر نسخة من الخريطة اتعملت فعلاً، حتى لو الـ effect
+    // اتنفذ واتلغى بسرعة قبل ما الـ import يخلص
     return () => {
-      if (map) map.remove();
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      if (containerRef.current) {
+        containerRef.current._leaflet_id = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

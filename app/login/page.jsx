@@ -1,18 +1,13 @@
 "use client";
 
-
-export const dynamic = 'force-dynamic';
-
-import { useState, Suspense } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { User, Phone, Mail, Lock, Loader2 } from "lucide-react";
 
-// 1. فصلنا المحتوى في Component منفصل عشان نقدر نغلفه
-function LoginContent() {
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
   // لو المستخدم كان بيحاول يعمل حاجة معينة (زي إتمام الطلب) وتحوّل هنا
   // عشان يسجل دخول، بعد النجاح هنرجّعه لنفس الصفحة اللي كان رايحلها
   const redirectTo = searchParams.get("redirect") || "/";
@@ -39,6 +34,9 @@ function LoginContent() {
     setError("");
     setLoading(true);
 
+    // supabase.auth.signUp بيعمل يوزر في auth.users
+    // الـ metadata (name, phone_number) بتتقرأ تلقائيًا من الـ trigger
+    // اللي عملناه في schema-updates.sql عشان يعمل سطر في جدول Users
     const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -57,6 +55,7 @@ function LoginContent() {
       return;
     }
 
+    // حسب المطلوب: بعد التسجيل نفضل في نفس الصفحة ونحوّل لتبويب تسجيل الدخول
     setNotice("تم إنشاء حسابك بنجاح، سجّل دخولك دلوقتي.");
     setMode("login");
     setForm((f) => ({ ...f, password: "" }));
@@ -149,20 +148,6 @@ function LoginContent() {
         </form>
       </div>
     </div>
-  );
-}
-
-// 2. الصفحة الأساسية اللي بتعرض المحتوى جوه Suspense
-export default function LoginPage() {
-  return (
-    // الـ fallback هو الحاجة اللي هتظهر (زي علامة تحميل) لحد ما الرابط يتقرأ
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#FF6B35]" size={32} />
-      </div>
-    }>
-      <LoginContent />
-    </Suspense>
   );
 }
 

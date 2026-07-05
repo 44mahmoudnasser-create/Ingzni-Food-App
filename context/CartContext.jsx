@@ -41,18 +41,35 @@ export function CartProvider({ children }) {
     }
   }, [cart, hydrated]);
 
-  const addItem = (product, restaurant) => {
+  const addItem = (product, restaurant, note = "") => {
     setCart((prev) => {
       const restaurantEntry = prev[restaurant.id] || { restaurant, items: {} };
       const existingQty = restaurantEntry.items[product.id]?.qty || 0;
+      const existingNote = restaurantEntry.items[product.id]?.note || "";
       return {
         ...prev,
         [restaurant.id]: {
           restaurant,
           items: {
             ...restaurantEntry.items,
-            [product.id]: { product, qty: existingQty + 1 },
+            [product.id]: { product, qty: existingQty + 1, note: note || existingNote },
           },
+        },
+      };
+    });
+  };
+
+  const updateNote = (restaurantId, productId, note) => {
+    setCart((prev) => {
+      const entry = prev[restaurantId];
+      if (!entry) return prev;
+      const item = entry.items[productId];
+      if (!item) return prev;
+      return {
+        ...prev,
+        [restaurantId]: {
+          ...entry,
+          items: { ...entry.items, [productId]: { ...item, note } },
         },
       };
     });
@@ -129,6 +146,7 @@ export function CartProvider({ children }) {
     addItem,
     incItem,
     decItem,
+    updateNote,
     removeSubOrder,
     clearCart,
   };

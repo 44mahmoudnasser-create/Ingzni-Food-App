@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { ChevronRight, Package, Clock, CheckCircle2, XCircle } from "lucide-react";
+import {
+  ChevronRight, Package, Clock, CheckCircle2, XCircle, Star,
+  StickyNote, Loader2, Navigation,
+} from "lucide-react";
 
 const STATUS_STYLES = {
   Pending: { label: "قيد الانتظار", bg: "bg-[#FEF3E2]", text: "text-[#8A5A0A]", icon: Clock },
@@ -22,20 +25,20 @@ export default function OrdersPage() {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        router.replace("/login");
+        router.replace("/login?redirect=/orders");
         return;
       }
 
-      // نجيب الطلب مع الطلبات الفرعية والمنتجات في استعلام واحد
-      // معتمدين على الـ foreign keys المعرّفة في الـ schema
       const { data, error } = await supabase
         .from("orders")
         .select(`
           id, total_amount, delivery_fee, payment_method, status, created_at,
+          notes, estimated_delivery_minutes, rating, rating_comment,
+          route_distance_km, route_maps_url,
           sub_orders (
             id, status,
             restaurants ( name ),
-            order_items ( id, quantity, unit_price, products ( name ) )
+            order_items ( id, quantity, unit_price, notes, products ( name ) )
           )
         `)
         .eq("user_id", userData.user.id)
@@ -48,6 +51,12 @@ export default function OrdersPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleRated = (orderId, rating, rating_comment) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, rating, rating_comment } : o))
+    );
+  };
 
   if (loading) return <p className="text-center py-20 text-[#8A8175]">جاري التحميل...</p>;
 
@@ -94,6 +103,16 @@ export default function OrdersPage() {
 
                 {expanded && (
                   <div className="px-4 pb-4 border-t border-dashed border-[#EFE9E1] pt-3">
+                    {order.estimated_delivery_minutes && (
+                      <p className="flex items-center gap-1.5 text-[12px] text-[#5C564C] mb-2.5">
+                        <Clock size={13} className="text-[#FF6B35]" />
+                        الوقت التقريبي للتوصيل:
+                        <span className="font-bold font-[JetBrains_Mono] text-[#24201B]">
+                          {order.estimated_delivery_minutes} دقيقة
+                        </span>
+                      </p>
+                    )}
+
                     {order.sub_orders?.map((so) => (
                       <div key={so.id} className="mb-3 last:mb-0">
                         <div className="flex items-center justify-between mb-1">
@@ -103,23 +122,138 @@ export default function OrdersPage() {
                           <span className="text-[11px] text-[#8A8175]">{so.status}</span>
                         </div>
                         {so.order_items?.map((oi) => (
-                          <div key={oi.id} className="flex justify-between text-[12px] font-[JetBrains_Mono] text-[#8A8175]">
-                            <span className="font-sans">{oi.products?.name} × {oi.quantity}</span>
-                            <span>{(oi.unit_price * oi.quantity).toLocaleString("ar-EG")} ج.م</span>
+                          <div key={oi.id} className="mb-1">
+                            <div className="flex justify-between text-[12px] font-[JetBrains_Mono] text-[#8A8175]">
+                              <span className="font-sans">{oi.products?.name} × {oi.quantity}</span>
+                              <span>{(oi.unit_price * oi.quantity).toLocaleString("ar-EG")} ج.م</span>
+                            </div>
+                            {oi.notes && (
+                              <p className="text-[10.5px] text-[#8A5A0A] flex items-center gap-1">
+                                <StickyNote size={9} /> {oi.notes}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
                     ))}
-                    <div className="flex justify-between text-[13px] font-bold text-[#24201B] pt-2 border-t border-[#EFE9E1] font-[JetBrains_Mono]">
+
+                    {order.notes && (
+                      <p className="text-[12px] text-[#8A5A0A] bg-[#FEF3E2] rounded-lg px-3 py-2 flex items-start gap-1.5 mb-2">
+                        <StickyNote size={12} className="mt-0.5 shrink-0" />
+                        {order.notes}
+                      </p>
+                    )}
+
+                    <div className="flex justify-between text-[13px] font-bold text-[#24201B] pt-2 border-t border-[#EFE9E1] font-[JetBrains_Mono] mb-3">
                       <span>الإجمالي</span>
                       <span>{Number(order.total_amount).toLocaleString("ar-EG")} ج.م</span>
                     </div>
+
+                    {order.route_maps_url && (
+                      <a
+                        href={order.route_maps_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1.5 mb-3 h-10 rounded-xl bg-[#F4EFE6] text-[#24201B] text-[12.5px] font-bold font-[Cairo]"
+                      >
+                        <Navigation size={14} className="text-[#FF6B35]" />
+                        افتح مسار التوصيل في خرائط جوجل
+                        {order.route_distance_km && (
+                          <span className="text-[#8A8175] font-normal">({order.route_distance_km} كم)</span>
+                        )}
+                      </a>
+                    )}
+
+                    {order.status === "Delivered" && (
+                      <RatingBox order={order} onRated={handleRated} />
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------
+   تقييم الطلب — بيظهر بس لما الطلب يبقى Delivered
+--------------------------------------------------- */
+function RatingBox({ order, onRated }) {
+  const [rating, setRating] = useState(order.rating || 0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState(order.rating_comment || "");
+  const [saving, setSaving] = useState(false);
+  const alreadyRated = Boolean(order.rating);
+  const [editing, setEditing] = useState(!alreadyRated);
+
+  const submitRating = async () => {
+    if (rating === 0) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("orders")
+      .update({ rating, rating_comment: comment.trim() || null })
+      .eq("id", order.id);
+    setSaving(false);
+    if (!error) {
+      onRated(order.id, rating, comment.trim() || null);
+      setEditing(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#FFFBF6] border border-[#EFE9E1] rounded-xl p-3">
+      <p className="text-[12.5px] font-bold font-[Cairo] text-[#24201B] mb-2">
+        {alreadyRated && !editing ? "تقييمك للطلب" : "قيّم الطلب ده"}
+      </p>
+
+      <div className="flex items-center gap-1 mb-2">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={!editing}
+            onMouseEnter={() => editing && setHoverRating(n)}
+            onMouseLeave={() => editing && setHoverRating(0)}
+            onClick={() => editing && setRating(n)}
+          >
+            <Star
+              size={22}
+              className={(hoverRating || rating) >= n ? "fill-[#F5A623] text-[#F5A623]" : "text-[#D8CFC0]"}
+            />
+          </button>
+        ))}
+      </div>
+
+      {editing ? (
+        <>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={2}
+            placeholder="اكتب رأيك في الطلب (اختياري)"
+            className="w-full rounded-lg border border-[#EFE9E1] p-2 text-[12.5px] outline-none focus:border-[#FF6B35] resize-none mb-2"
+          />
+          <button
+            onClick={submitRating}
+            disabled={rating === 0 || saving}
+            className="h-9 px-4 rounded-lg bg-[#FF6B35] disabled:opacity-60 text-white text-[12.5px] font-bold font-[Cairo] flex items-center gap-2"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            حفظ التقييم
+          </button>
+        </>
+      ) : (
+        <>
+          {order.rating_comment && (
+            <p className="text-[12px] text-[#5C564C] mb-2">{order.rating_comment}</p>
+          )}
+          <button onClick={() => setEditing(true)} className="text-[11.5px] font-semibold text-[#FF6B35]">
+            تعديل التقييم
+          </button>
+        </>
       )}
     </div>
   );

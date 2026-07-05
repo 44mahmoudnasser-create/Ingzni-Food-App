@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/context/CartContext";
-import { buildGoogleMapsDirectionsUrl } from "@/lib/googleMaps";
-import { MapPin, Banknote, Wallet, Smartphone, Loader2, Plus, Clock, StickyNote, Navigation } from "lucide-react";
+import { MapPin, Banknote, Wallet, Smartphone, Loader2, Plus, Clock, StickyNote } from "lucide-react";
 
 const PAYMENT_METHODS = [
   { id: "cash", label: "كاش عند الاستلام", icon: Banknote },
@@ -13,17 +12,10 @@ const PAYMENT_METHODS = [
   { id: "instapay", label: "انستاباي", icon: Smartphone },
 ];
 
-const BASE_FEE = 10; // ج.م
-const FEE_PER_KM = 2.5; // ج.م لكل كيلومتر
-const PREP_TIME_MIN = 15; // وقت تجهيز تقريبي في المطعم (دقايق)
-const FALLBACK_FEE = 20; // ج.م لو مفيش إحداثيات أو الـ API فشل
-const FALLBACK_MINUTES = 35; // دقيقة احتياطية لو مفيش إحداثيات أو الـ API فشل
-
 // -------------------------------------------------------------
-// Fallback: خط مستقيم (Haversine) — بيتستخدم بس لو مسار جوجل فشل
-// أو لو لسه فيه مطعم/عنوان من غير إحداثيات
+// حساب المسافة بين نقطتين (خط مستقيم) بصيغة Haversine بالكيلومتر
 // -------------------------------------------------------------
-function distanceKmHaversine(lat1, lng1, lat2, lng2) {
+function distanceKm(lat1, lng1, lat2, lng2) {
   const toRad = (deg) => (deg * Math.PI) / 180;
   const R = 6371;
   const dLat = toRad(lat2 - lat1);
@@ -34,35 +26,58 @@ function distanceKmHaversine(lat1, lng1, lat2, lng2) {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-function fallbackDeliveryFee(subOrders, address) {
-  return subOrders.reduce((sum, so) => {
-    const r = so.restaurant;
-    const hasR = r.latitude && r.longitude;
-    const hasA = address?.latitude && address?.longitude;
-    if (!hasR || !hasA) return sum + FALLBACK_FEE;
-    const km = distanceKmHaversine(
-      Number(r.latitude), Number(r.longitude),
-      Number(address.latitude), Number(address.longitude)
-    );
-    return sum + Math.round(BASE_FEE + km * FEE_PER_KM);
-  }, 0);
+// -------------------------------------------------------------
+// رسوم التوصيل: رسوم أساسية + سعر لكل كيلومتر بين المطعم والعنوان.
+// دي مسافة خط مستقيم تقريبية (مش مسافة الطريق الفعلية)، وده كافي
+// كبداية. لو حبيت دقة أكبر لاحقًا (تحسب الزحمة والطرق الفعلية)،
+// استبدل الدالة دي بنداء Google Distance Matrix API أو ما شابه،
+// بنفس الـ inputs (lat/lng المطعم و lat/lng العنوان).
+// -------------------------------------------------------------
+const BASE_FEE = 10; // ج.م
+const FEE_PER_KM = 2.5; // ج.م لكل كيلومتر
+
+function estimateDeliveryFee(restaurant, address) {
+  if (!restaurant || !address) return 0;
+
+  const hasRestaurantLocation = restaurant.latitude && restaurant.longitude;
+  const hasAddressLocation = address.latitude && address.longitude;
+
+  // لو لسه مفيش إحداثيات (مطعم أو عنوان قديم من غير موقع)، رجّع رسوم ثابتة احتياطية
+  if (!hasRestaurantLocation || !hasAddressLocation) return 20;
+
+  const km = distanceKm(
+    Number(restaurant.latitude), Number(restaurant.longitude),
+    Number(address.latitude), Number(address.longitude)
+  );
+
+  return Math.round(BASE_FEE + km * FEE_PER_KM);
 }
 
-function fallbackDeliveryMinutes(subOrders, address) {
-  if (!subOrders.length) return null;
-  const AVG_SPEED_KMH = 25;
-  const minutesPerRestaurant = subOrders.map((so) => {
-    const r = so.restaurant;
-    const hasR = r.latitude && r.longitude;
-    const hasA = address?.latitude && address?.longitude;
-    if (!hasR || !hasA) return FALLBACK_MINUTES;
-    const km = distanceKmHaversine(
-      Number(r.latitude), Number(r.longitude),
-      Number(address.latitude), Number(address.longitude)
-    );
-    return Math.round(PREP_TIME_MIN + (km / AVG_SPEED_KMH) * 60);
-  });
-  return Math.max(...minutesPerRestaurant);
+// -------------------------------------------------------------
+// الوقت التقريبي للتوصيل: وقت تجهيز تقريبي في المطعم + وقت انتقال
+// تقريبي بناءً على المسافة (خط مستقيم) ومتوسط سرعة افتراضي.
+// ملاحظة: دي قيمة تقريبية بس مبدئيًا؛ لسه مفيش حساب دقيق للزحمة
+// أو الطريق الفعلي. لو حبيت دقة أكبر لاحقًا، استبدلها بنداء API
+// حقيقي (Google Distance Matrix مثلاً) بيرجع "duration" فعلي.
+// -------------------------------------------------------------
+const PREP_TIME_MIN = 15; // وقت تجهيز تقريبي في المطعم
+const AVG_SPEED_KMH = 25; // متوسط سرعة تقريبي داخل المدينة
+
+function estimateDeliveryMinutes(restaurant, address) {
+  if (!restaurant || !address) return null;
+
+  const hasRestaurantLocation = restaurant.latitude && restaurant.longitude;
+  const hasAddressLocation = address.latitude && address.longitude;
+
+  if (!hasRestaurantLocation || !hasAddressLocation) return 35; // قيمة افتراضية احتياطية
+
+  const km = distanceKm(
+    Number(restaurant.latitude), Number(restaurant.longitude),
+    Number(address.latitude), Number(address.longitude)
+  );
+  const travelMinutes = (km / AVG_SPEED_KMH) * 60;
+
+  return Math.round(PREP_TIME_MIN + travelMinutes);
 }
 
 export default function CheckoutPage() {
@@ -78,10 +93,6 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
-  // نتيجة مسار جوجل الحقيقي (المسافة والوقت مع ترتيب أفضل للمطاعم)
-  const [route, setRoute] = useState(null); // { distanceKm, durationMins, waypointOrder }
-  const [loadingRoute, setLoadingRoute] = useState(false);
-
   useEffect(() => {
     if (subOrders.length === 0) {
       router.replace("/");
@@ -91,7 +102,7 @@ export default function CheckoutPage() {
     const init = async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        router.replace("/login?redirect=/checkout");
+        router.replace("/login");
         return;
       }
       setUserId(userData.user.id);
@@ -116,107 +127,17 @@ export default function CheckoutPage() {
 
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
 
-  // إحداثيات المطاعم (لو كل المطاعم في الأوردر عندها إحداثيات)
-  const restaurantsCoords = subOrders
-    .map((so) => so.restaurant)
-    .filter((r) => r.latitude && r.longitude)
-    .map((r) => ({ lat: Number(r.latitude), lng: Number(r.longitude) }));
-
-  const hasAllCoords =
-    restaurantsCoords.length === subOrders.length &&
-    selectedAddress?.latitude &&
-    selectedAddress?.longitude;
-
-  // لينك جاهز يفتح خرائط جوجل برحلة واحدة: كل المطاعم بالترتيب ثم العميل.
-  // لو عندنا ترتيب أمثل من Google Directions (route.waypointOrder) بنستخدمه،
-  // غير كده اللينك بيمشي بالترتيب اللي المطاعم مضافة بيه في السلة.
-  const mapsUrl = hasAllCoords
-    ? buildGoogleMapsDirectionsUrl(
-        restaurantsCoords,
-        { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) },
-        route?.waypointOrder
-      )
-    : null;
-
-  // -------------------------------------------------------------
-  // كل ما يتغير العنوان المختار، نطلب مسار التوصيل الحقيقي من جوجل
-  // عن طريق الـ API route بتاعنا (/api/delivery-route)، مش من المتصفح
-  // مباشرة، عشان مشكلة CORS ومفتاح الـ API السري.
-  // -------------------------------------------------------------
-  useEffect(() => {
-    if (!selectedAddress || subOrders.length === 0) {
-      setRoute(null);
-      return;
-    }
-
-    const restaurantsCoords = subOrders
-      .map((so) => so.restaurant)
-      .filter((r) => r.latitude && r.longitude)
-      .map((r) => ({ lat: Number(r.latitude), lng: Number(r.longitude) }));
-
-    // لو مطعم أو أكتر لسه من غير إحداثيات، منقدرش نحسب مسار حقيقي
-    if (
-      restaurantsCoords.length !== subOrders.length ||
-      !selectedAddress.latitude ||
-      !selectedAddress.longitude
-    ) {
-      setRoute(null);
-      return;
-    }
-
-    let cancelled = false;
-    setLoadingRoute(true);
-
-    fetch("/api/delivery-route", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        restaurants: restaurantsCoords,
-        customer: {
-          lat: Number(selectedAddress.latitude),
-          lng: Number(selectedAddress.longitude),
-        },
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.error) {
-          console.error("delivery-route:", data.error);
-          setRoute(null);
-        } else {
-          setRoute(data);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          console.error("delivery-route fetch failed:", err);
-          setRoute(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingRoute(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId, subOrders.length]);
-
-  // رسوم التوصيل: لو عندنا مسار حقيقي من جوجل بنستخدمه، غير كده بنرجع
-  // لطريقة الخط المستقيم (fallback)
-  const deliveryFee = route
-    ? Math.round(BASE_FEE + Number(route.distanceKm) * FEE_PER_KM)
-    : fallbackDeliveryFee(subOrders, selectedAddress);
-
+  const deliveryFee = subOrders.reduce(
+    (sum, so) => sum + estimateDeliveryFee(so.restaurant, selectedAddress),
+    0
+  );
   const total = subtotal + deliveryFee;
 
-  // الوقت التقريبي للتوصيل: وقت التجهيز + وقت الانتقال الحقيقي من جوجل
-  // (أو الـ fallback التقريبي لو المسار الحقيقي مش متاح)
-  const estimatedMinutes = route
-    ? PREP_TIME_MIN + route.durationMins
-    : fallbackDeliveryMinutes(subOrders, selectedAddress);
+  // بناخد أطول وقت تقديري من بين المطاعم، لأن المندوب هيمر عليهم كلهم
+  // قبل ما يوصل للعميل
+  const estimatedMinutes = subOrders.length
+    ? Math.max(...subOrders.map((so) => estimateDeliveryMinutes(so.restaurant, selectedAddress) || 0))
+    : null;
 
   // -------------------------------------------------------------
   // تأكيد الطلب: بيتسجل في 3 جداول مرتبطة ببعض
@@ -241,13 +162,6 @@ export default function CheckoutPage() {
         payment_method: payment,
         notes: orderNote.trim() || null,
         estimated_delivery_minutes: estimatedMinutes,
-        // بيانات المسار الفعلي من جوجل (لو اتحسب)، عشان نحتفظ بيه مع
-        // الأوردر ونقدر نعرضه بعدين (مسافة، خط المسار، ترتيب المطاعم)
-        route_distance_km: route ? Number(route.distanceKm) : null,
-        route_polyline: route?.overviewPolyline || null,
-        route_waypoint_order: route?.waypointOrder || null,
-        route_legs: route?.legs || null,
-        route_maps_url: mapsUrl,
         status: "Pending",
       })
       .select()
@@ -386,19 +300,7 @@ export default function CheckoutPage() {
         ))}
         <div className="space-y-1.5 pt-3 border-t border-dashed border-[#EFE9E1] font-[JetBrains_Mono] text-[13px]">
           <div className="flex justify-between text-[#5C564C]"><span>الإجمالي الفرعي</span><span>{subtotal.toLocaleString("ar-EG")} ج.م</span></div>
-          <div className="flex justify-between text-[#5C564C]">
-            <span>
-              رسوم التوصيل
-              {loadingRoute && <span className="text-[11px] text-[#B0A99C]"> (جاري حساب المسار...)</span>}
-            </span>
-            <span>{deliveryFee.toLocaleString("ar-EG")} ج.م</span>
-          </div>
-          {route && (
-            <div className="flex justify-between text-[11px] text-[#B0A99C]">
-              <span>مسافة التوصيل الفعلية</span>
-              <span>{route.distanceKm} كم</span>
-            </div>
-          )}
+          <div className="flex justify-between text-[#5C564C]"><span>رسوم التوصيل</span><span>{deliveryFee.toLocaleString("ar-EG")} ج.م</span></div>
           <div className="flex justify-between text-[#24201B] font-bold text-[15px] pt-1.5 border-t border-[#EFE9E1]"><span>الإجمالي</span><span>{total.toLocaleString("ar-EG")} ج.م</span></div>
         </div>
         {estimatedMinutes && (
@@ -406,18 +308,6 @@ export default function CheckoutPage() {
             <Clock size={14} className="text-[#FF6B35]" />
             الوقت التقريبي للتوصيل: <span className="font-bold font-[JetBrains_Mono] text-[#24201B]">{estimatedMinutes} دقيقة</span>
           </div>
-        )}
-
-        {mapsUrl && (
-          <a
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 mt-3 h-10 rounded-xl bg-[#F4EFE6] text-[#24201B] text-[12.5px] font-bold font-[Cairo]"
-          >
-            <Navigation size={14} className="text-[#FF6B35]" />
-            افتح مسار التوصيل في خرائط جوجل
-          </a>
         )}
       </section>
 

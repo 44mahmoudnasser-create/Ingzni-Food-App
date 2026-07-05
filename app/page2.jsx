@@ -186,9 +186,17 @@ export default function HomePage() {
                   onClick={() => openRestaurant(r)}
                   className="text-right bg-white rounded-2xl border border-[#EFE9E1] overflow-hidden hover:border-[#E3D9CB] transition-all active:scale-[0.98]"
                 >
-                  <div className="h-28 bg-[#FFF1EB] flex items-center justify-center">
-                    <UtensilsCrossed size={32} strokeWidth={1.5} className="text-[#B23E12]" />
-                  </div>
+                  <div className="h-28 bg-[#FFF1EB] flex items-center justify-center overflow-hidden">
+  {r.image_url ? (
+    <img 
+      src={r.image_url} 
+      alt={r.name} 
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <UtensilsCrossed size={32} strokeWidth={1.5} className="text-[#B23E12]" />
+  )}
+</div>
                   <div className="p-3.5">
                     <h3 className="font-bold font-[Cairo] text-[15px] text-[#24201B]">{r.name}</h3>
                     <p className="text-[12.5px] text-[#8A8175] mb-1.5">{r.category || "غير مصنف"}</p>
