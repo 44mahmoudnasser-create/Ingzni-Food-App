@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/context/CartContext";
 import {
@@ -13,6 +13,7 @@ const CATEGORIES = ["مشاوي", "بيتزا", "أكل صحي", "مشروبات
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [restaurants, setRestaurants] = useState([]);
@@ -100,6 +101,23 @@ export default function HomePage() {
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
     );
   };
+
+  // -------------------------------------------------
+  // لو المستخدم جاي من مكوّن البحث في الشريط السفلي (رابط فيه
+  // ?restaurant=<id>)، نفتحله المطعم ده تلقائيًا
+  // -------------------------------------------------
+  useEffect(() => {
+    const restaurantId = searchParams.get("restaurant");
+    if (!restaurantId) return;
+
+    const openFromLink = async () => {
+      const { data } = await supabase.from("restaurants").select("*").eq("id", restaurantId).single();
+      if (data) openRestaurant(data);
+      router.replace("/"); // نظّف الرابط بعد الفتح
+    };
+    openFromLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // -------------------------------------------------
   // فتح مطعم وجلب المنتجات المتاحة بتاعته
@@ -208,7 +226,10 @@ export default function HomePage() {
           )}
         </main>
 
-        <CartPanel onCheckout={() => goToProtected("/checkout")} />
+        {/* على الموبايل السلة بتتفتح من الشريط السفلي، فالبانل ده للشاشات الكبيرة بس */}
+        <div className="hidden lg:block">
+          <CartPanel onCheckout={() => goToProtected("/checkout")} />
+        </div>
       </div>
 
       {activeRestaurant && (

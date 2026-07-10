@@ -1,17 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-// شيلنا useSearchParams خالص من هنا
 import { supabase } from "@/lib/supabaseClient";
 import { User, Phone, Mail, Lock, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-
-  // عملنا متغير عشان نحفظ فيه مسار التحويل
-  const [redirectTo, setRedirectTo] = useState("/");
-
   const [mode, setMode] = useState("login"); // login | signup
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,17 +19,6 @@ export default function LoginPage() {
     password: "",
   });
 
-  // الكود ده بيقرا الرابط من المتصفح مباشرة (Vercel مش هيشوفه وقت الـ Build)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const redirectParam = params.get("redirect");
-      if (redirectParam) {
-        setRedirectTo(redirectParam);
-      }
-    }
-  }, []);
-
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   // -------------------------------------------------
@@ -45,6 +29,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+    // supabase.auth.signUp بيعمل يوزر في auth.users
+    // الـ metadata (name, phone_number) بتتقرأ تلقائيًا من الـ trigger
+    // اللي عملناه في schema-updates.sql عشان يعمل سطر في جدول Users
     const { error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -63,6 +50,7 @@ export default function LoginPage() {
       return;
     }
 
+    // حسب المطلوب: بعد التسجيل نفضل في نفس الصفحة ونحوّل لتبويب تسجيل الدخول
     setNotice("تم إنشاء حسابك بنجاح، سجّل دخولك دلوقتي.");
     setMode("login");
     setForm((f) => ({ ...f, password: "" }));
@@ -88,7 +76,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push(redirectTo);
+    router.push("/");
   };
 
   return (

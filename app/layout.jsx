@@ -1,4 +1,6 @@
 import { CartProvider } from "@/context/CartContext";
+import CartDrawer from "@/components/CartDrawer";
+import MobileBottomNav from "@/components/MobileBottomNav";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
@@ -17,8 +19,14 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body style={{ fontFamily: "'Tajawal', sans-serif" }} className="bg-[#FFFBF6]">
-        <CartProvider>{children}</CartProvider>
+        <CartProvider>
+          {/* مساحة فاضية تحت المحتوى بمقدار ارتفاع الشريط السفلي، بس على الموبايل */}
+          <div className="pb-16 lg:pb-0">{children}</div>
+          <MobileBottomNav />
+          <CartDrawer />
+        </CartProvider>
       </body>
     </html>
   );
 }
+

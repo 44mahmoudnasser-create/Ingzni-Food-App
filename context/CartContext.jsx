@@ -21,6 +21,10 @@ const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [cart, setCart] = useState({});
   const [hydrated, setHydrated] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
 
   // تحميل الكارت المحفوظ محليًا (لو المستخدم قفل المتصفح وفتحه تاني)
   useEffect(() => {
@@ -149,6 +153,9 @@ export function CartProvider({ children }) {
     updateNote,
     removeSubOrder,
     clearCart,
+    isCartOpen,
+    openCart,
+    closeCart,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

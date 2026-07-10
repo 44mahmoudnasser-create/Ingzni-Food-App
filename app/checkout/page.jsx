@@ -15,9 +15,9 @@ const PAYMENT_METHODS = [
 
 const BASE_FEE = 10; // ج.م
 const FEE_PER_KM = 2.5; // ج.م لكل كيلومتر
-const PREP_TIME_MIN = 15; // وقت تجهيز تقريبي في المطعم (دقايق)
+const DEFAULT_PREP_MIN = 15; // وقت تجهيز افتراضي لو المطعم مفيهوش قيمة في العمود prep_time_minutes
 const FALLBACK_FEE = 20; // ج.م لو مفيش إحداثيات أو الـ API فشل
-const FALLBACK_MINUTES = 35; // دقيقة احتياطية لو مفيش إحداثيات أو الـ API فشل
+const FALLBACK_TRAVEL_MIN = 20; // دقيقة انتقال احتياطية لو مفيش إحداثيات أو الـ API فشل
 
 // -------------------------------------------------------------
 // Fallback: خط مستقيم (Haversine) — بيتستخدم بس لو مسار جوجل فشل
@@ -48,19 +48,29 @@ function fallbackDeliveryFee(subOrders, address) {
   }, 0);
 }
 
-function fallbackDeliveryMinutes(subOrders, address) {
-  if (!subOrders.length) return null;
+// وقت التجهيز: بناخد أطول وقت تجهيز من بين كل مطاعم الأوردر (لأن
+// المندوب مش هيقدر ياخد الطلب كله غير لما كل المطاعم تخلّص)
+function slowestPrepMinutes(subOrders) {
+  if (!subOrders.length) return DEFAULT_PREP_MIN;
+  return Math.max(...subOrders.map((so) => so.restaurant.prep_time_minutes || DEFAULT_PREP_MIN));
+}
+
+// وقت الانتقال التقريبي (fallback خط مستقيم) — بناخد أطول وقت انتقال
+// من بين المطاعم كتقدير للوقت اللي المندوب هياخده لحد ما يجمع الطلبات
+// ويوصل للعميل
+function fallbackTravelMinutes(subOrders, address) {
+  if (!subOrders.length) return FALLBACK_TRAVEL_MIN;
   const AVG_SPEED_KMH = 25;
   const minutesPerRestaurant = subOrders.map((so) => {
     const r = so.restaurant;
     const hasR = r.latitude && r.longitude;
     const hasA = address?.latitude && address?.longitude;
-    if (!hasR || !hasA) return FALLBACK_MINUTES;
+    if (!hasR || !hasA) return FALLBACK_TRAVEL_MIN;
     const km = distanceKmHaversine(
       Number(r.latitude), Number(r.longitude),
       Number(address.latitude), Number(address.longitude)
     );
-    return Math.round(PREP_TIME_MIN + (km / AVG_SPEED_KMH) * 60);
+    return Math.round((km / AVG_SPEED_KMH) * 60);
   });
   return Math.max(...minutesPerRestaurant);
 }
@@ -79,7 +89,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
 
   // نتيجة مسار جوجل الحقيقي (المسافة والوقت مع ترتيب أفضل للمطاعم)
-  const [route, setRoute] = useState(null); // { distanceKm, durationMins, waypointOrder }
+  const [route, setRoute] = useState(null); // { distanceKm, durationMins, restaurantOrder }
   const [loadingRoute, setLoadingRoute] = useState(false);
 
   useEffect(() => {
@@ -128,15 +138,16 @@ export default function CheckoutPage() {
     selectedAddress?.longitude;
 
   // لينك جاهز يفتح خرائط جوجل برحلة واحدة: كل المطاعم بالترتيب ثم العميل.
-  // لو عندنا ترتيب أمثل من Google Directions (route.waypointOrder) بنستخدمه،
+  // لو عندنا ترتيب أمثل من Google Directions (route.restaurantOrder) بنستخدمه،
   // غير كده اللينك بيمشي بالترتيب اللي المطاعم مضافة بيه في السلة.
- const mapsUrl = hasAllCoords
-  ? buildGoogleMapsDirectionsUrl(
-      restaurantsCoords,
-      { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) },
-      route?.restaurantOrder   // ✅ بدل route?.waypointOrder
-    )
-  : null;
+  const mapsUrl = hasAllCoords
+    ? buildGoogleMapsDirectionsUrl(
+        restaurantsCoords,
+        { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) },
+        route?.restaurantOrder
+      )
+    : null;
+
   // -------------------------------------------------------------
   // كل ما يتغير العنوان المختار، نطلب مسار التوصيل الحقيقي من جوجل
   // عن طريق الـ API route بتاعنا (/api/delivery-route)، مش من المتصفح
@@ -211,11 +222,16 @@ export default function CheckoutPage() {
 
   const total = subtotal + deliveryFee;
 
-  // الوقت التقريبي للتوصيل: وقت التجهيز + وقت الانتقال الحقيقي من جوجل
-  // (أو الـ fallback التقريبي لو المسار الحقيقي مش متاح)
-  const estimatedMinutes = route
-    ? PREP_TIME_MIN + route.durationMins
-    : fallbackDeliveryMinutes(subOrders, selectedAddress);
+  // -------------------------------------------------------------
+  // الوقت التقريبي للتوصيل = وقت تجهيز الطلب في المطعم (عمود
+  // prep_time_minutes) + وقت الحركة الفعلي (من Google، أو خط مستقيم
+  // تقريبي لو المسار الحقيقي مش متاح). بناخد أطول وقت تجهيز من بين
+  // مطاعم الأوردر، لأن المندوب مش بيتحرك للعميل غير لما كل الطلبات
+  // تخلص تجهيز.
+  // -------------------------------------------------------------
+  const prepMinutes = slowestPrepMinutes(subOrders);
+  const travelMinutes = route ? route.durationMins : fallbackTravelMinutes(subOrders, selectedAddress);
+  const estimatedMinutes = prepMinutes + travelMinutes;
 
   // -------------------------------------------------------------
   // تأكيد الطلب: بيتسجل في 3 جداول مرتبطة ببعض
@@ -244,7 +260,7 @@ export default function CheckoutPage() {
         // الأوردر ونقدر نعرضه بعدين (مسافة، خط المسار، ترتيب المطاعم)
         route_distance_km: route ? Number(route.distanceKm) : null,
         route_polyline: route?.overviewPolyline || null,
-route_waypoint_order: route?.restaurantOrder || null,   // ✅ بدل route?.waypointOrder
+        route_waypoint_order: route?.restaurantOrder || null,
         route_legs: route?.legs || null,
         route_maps_url: mapsUrl,
         status: "Pending",
@@ -400,12 +416,16 @@ route_waypoint_order: route?.restaurantOrder || null,   // ✅ بدل route?.way
           )}
           <div className="flex justify-between text-[#24201B] font-bold text-[15px] pt-1.5 border-t border-[#EFE9E1]"><span>الإجمالي</span><span>{total.toLocaleString("ar-EG")} ج.م</span></div>
         </div>
-        {estimatedMinutes && (
-          <div className="flex items-center gap-1.5 text-[12.5px] text-[#5C564C] mt-3 pt-3 border-t border-dashed border-[#EFE9E1]">
+
+        <div className="mt-3 pt-3 border-t border-dashed border-[#EFE9E1]">
+          <div className="flex items-center gap-1.5 text-[12.5px] text-[#5C564C] mb-1">
             <Clock size={14} className="text-[#FF6B35]" />
             الوقت التقريبي للتوصيل: <span className="font-bold font-[JetBrains_Mono] text-[#24201B]">{estimatedMinutes} دقيقة</span>
           </div>
-        )}
+          <p className="text-[11px] text-[#B0A99C]">
+            (تجهيز الطلب ~{prepMinutes} دقيقة + وقت الحركة ~{travelMinutes} دقيقة)
+          </p>
+        </div>
 
         {mapsUrl && (
           <a
@@ -437,7 +457,7 @@ route_waypoint_order: route?.restaurantOrder || null,   // ✅ بدل route?.way
 
       {error && <p className="text-[#A32D2D] text-[13px] mt-4">{error}</p>}
 
-      <div className="fixed bottom-4 inset-x-0 px-4">
+      <div className="fixed bottom-20 lg:bottom-4 inset-x-0 px-4">
         <button
           onClick={handlePlaceOrder}
           disabled={placing || !selectedAddressId}

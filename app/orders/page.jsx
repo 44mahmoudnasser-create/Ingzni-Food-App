@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
   ChevronRight, Package, Clock, CheckCircle2, XCircle, Star,
-  StickyNote, Loader2, Navigation,
+  StickyNote, Loader2,
 } from "lucide-react";
 
 const STATUS_STYLES = {
@@ -25,7 +25,7 @@ export default function OrdersPage() {
     const load = async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
-        router.replace("/login?redirect=/orders");
+        router.replace("/login");
         return;
       }
 
@@ -34,7 +34,6 @@ export default function OrdersPage() {
         .select(`
           id, total_amount, delivery_fee, payment_method, status, created_at,
           notes, estimated_delivery_minutes, rating, rating_comment,
-          route_distance_km, route_maps_url,
           sub_orders (
             id, status,
             restaurants ( name ),
@@ -148,21 +147,6 @@ export default function OrdersPage() {
                       <span>الإجمالي</span>
                       <span>{Number(order.total_amount).toLocaleString("ar-EG")} ج.م</span>
                     </div>
-
-                    {order.route_maps_url && (
-                      <a
-                        href={order.route_maps_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 mb-3 h-10 rounded-xl bg-[#F4EFE6] text-[#24201B] text-[12.5px] font-bold font-[Cairo]"
-                      >
-                        <Navigation size={14} className="text-[#FF6B35]" />
-                        افتح مسار التوصيل في خرائط جوجل
-                        {order.route_distance_km && (
-                          <span className="text-[#8A8175] font-normal">({order.route_distance_km} كم)</span>
-                        )}
-                      </a>
-                    )}
 
                     {order.status === "Delivered" && (
                       <RatingBox order={order} onRated={handleRated} />
