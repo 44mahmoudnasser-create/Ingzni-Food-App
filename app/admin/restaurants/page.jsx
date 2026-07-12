@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2, Check, X, UtensilsCrossed } from "lucide-react";
 
 const EMPTY_DRAFT = {
   name: "",
-  category: "",
+  category_id: "",
   address: "",
   image_url: "",
   latitude: null,
@@ -17,6 +17,7 @@ const EMPTY_DRAFT = {
 
 export default function AdminRestaurantsPage() {
   const [restaurants, setRestaurants] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -27,17 +28,20 @@ export default function AdminRestaurantsPage() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error: err } = await supabase
-      .from("restaurants")
-      .select("*")
-      .order("name");
-    if (!err) setRestaurants(data || []);
+    const [restaurantsRes, categoriesRes] = await Promise.all([
+      supabase.from("restaurants").select("*").order("name"),
+      supabase.from("restaurant_categories").select("*").order("sort_order"),
+    ]);
+    if (!restaurantsRes.error) setRestaurants(restaurantsRes.data || []);
+    if (!categoriesRes.error) setCategories(categoriesRes.data || []);
     setLoading(false);
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  const categoryName = (id) => categories.find((c) => c.id === id)?.name || "بدون تصنيف";
 
   const startAdd = () => {
     setDraft(EMPTY_DRAFT);
@@ -48,7 +52,7 @@ export default function AdminRestaurantsPage() {
   const startEdit = (r) => {
     setDraft({
       name: r.name || "",
-      category: r.category || "",
+      category_id: r.category_id || "",
       address: r.address || "",
       image_url: r.image_url || "",
       latitude: r.latitude,
@@ -73,14 +77,16 @@ export default function AdminRestaurantsPage() {
     setError("");
     setSaving(true);
 
+    const payload = { ...draft, category_id: draft.category_id || null };
+
     if (editingId) {
       const { error: err } = await supabase
         .from("restaurants")
-        .update(draft)
+        .update(payload)
         .eq("id", editingId);
       if (err) setError(err.message);
     } else {
-      const { error: err } = await supabase.from("restaurants").insert(draft);
+      const { error: err } = await supabase.from("restaurants").insert(payload);
       if (err) setError(err.message);
     }
 
@@ -114,12 +120,21 @@ export default function AdminRestaurantsPage() {
         placeholder="اسم المطعم"
         className="w-full h-10 rounded-lg border border-[#EFE9E1] px-3 text-[13px] outline-none focus:border-[#FF6B35]"
       />
-      <input
-        value={draft.category}
-        onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
-        placeholder="التصنيف (مشاوي، بيتزا، أكل صحي...)"
-        className="w-full h-10 rounded-lg border border-[#EFE9E1] px-3 text-[13px] outline-none focus:border-[#FF6B35]"
-      />
+      <select
+        value={draft.category_id}
+        onChange={(e) => setDraft((d) => ({ ...d, category_id: e.target.value }))}
+        className="w-full h-10 rounded-lg border border-[#EFE9E1] px-3 text-[13px] outline-none focus:border-[#FF6B35] bg-white"
+      >
+        <option value="">بدون تصنيف</option>
+        {categories.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+      {categories.length === 0 && (
+        <p className="text-[11.5px] text-[#8A5A0A]">
+          مفيش تصنيفات لسه — ضيفي واحد من صفحة "التصنيفات" الأول.
+        </p>
+      )}
       <textarea
         value={draft.address}
         onChange={(e) => setDraft((d) => ({ ...d, address: e.target.value }))}
@@ -202,7 +217,7 @@ export default function AdminRestaurantsPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold font-[Cairo] text-[14px] text-[#24201B] truncate">{r.name}</p>
-                    <p className="text-[12px] text-[#8A8175] truncate">{r.category || "غير مصنف"}</p>
+                    <p className="text-[12px] text-[#8A8175] truncate">{categoryName(r.category_id)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
