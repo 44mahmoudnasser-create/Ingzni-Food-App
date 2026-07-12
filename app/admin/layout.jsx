@@ -5,12 +5,13 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  LayoutDashboard, UtensilsCrossed, Package, ClipboardList, Users, LogOut,
+  LayoutDashboard, UtensilsCrossed, Package, ClipboardList, Users, LogOut, Tag,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
   { href: "/admin/restaurants", label: "المطاعم", icon: UtensilsCrossed },
+  { href: "/admin/categories", label: "التصنيفات", icon: Tag },
   { href: "/admin/products", label: "المنتجات", icon: Package },
   { href: "/admin/orders", label: "الطلبات", icon: ClipboardList },
   { href: "/admin/users", label: "المستخدمين", icon: Users },
