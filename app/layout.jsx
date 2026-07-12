@@ -1,7 +1,6 @@
 import { CartProvider } from "@/context/CartContext";
 import CartDrawer from "@/components/CartDrawer";
 import MobileBottomNav from "@/components/MobileBottomNav";
-import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata = {
