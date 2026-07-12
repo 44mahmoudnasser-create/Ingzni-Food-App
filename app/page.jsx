@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/context/CartContext";
@@ -12,14 +12,6 @@ import {
 const CATEGORIES = ["مشاوي", "بيتزا", "أكل صحي", "مشروبات", "شرقي"];
 
 export default function HomePage() {
-  return (
-    <Suspense fallback={null}>
-      <HomeContent />
-    </Suspense>
-  );
-}
-
-function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -516,19 +508,5 @@ function CartPanel({ onCheckout }) {
         </>
       )}
     </aside>
-  );
-}
-import { Suspense } from "react"; // تأكد إن دي مكتوبة فوق مع الـ imports
-
-// الدالة دي هي اللي Next.js هيشوفها، وهتشغل محتوى الصفحة بتاعتك جوه Suspense
-export default function HomePage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <p>جاري التحميل...</p>
-      </div>
-    }>
-      <HomeContent />
-    </Suspense>
   );
 }
