@@ -444,8 +444,7 @@ export default function CheckoutPage() {
 
       {error && <p className="text-[#A32D2D] text-[13px] mt-4">{error}</p>}
 
-      <div className="fixed bottom-30 inset-x-0 px-4">
-        <button
+    <div className="fixed bottom-10 inset-x-0 px-4">        <button
           onClick={handlePlaceOrder}
           disabled={placing || !selectedAddressId}
           className="max-w-2xl mx-auto w-full h-[52px] rounded-2xl bg-[#FF6B35] disabled:opacity-60 text-white font-bold font-[Cairo] text-[15px] flex items-center justify-center gap-2 transition"
