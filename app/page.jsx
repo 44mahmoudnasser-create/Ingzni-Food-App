@@ -308,7 +308,7 @@ function MenuModal({ restaurant, items, loading, onClose }) {
 
         {/* شرايط تنقّل سريع بين الأقسام — تظهر بس لو أكتر من قسم واحد */}
         {sections.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto px-5 py-3 scrollbar-none">
+          <div className="flex gap-2 overflow-x-auto px-5 py-6 scrollbar-none">
             {sections.map((s) => (
               <button
                 key={s.name}
