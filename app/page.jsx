@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/context/CartContext";
+import CartDrawer from "@/components/CartDrawer"; // 👈 تأكد من المسار حسب مجلداتك
 import {
   Search, User, ClipboardList, Star, Plus, Minus, X,
   ShoppingBag, Trash2, UtensilsCrossed, ShieldCheck,
