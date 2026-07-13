@@ -6,8 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ChevronRight, User, Phone, MapPin, Plus, Pencil, Trash2, LogOut, Check, X } from "lucide-react";
 import LocationPicker from "@/components/LocationPicker";
 import NotificationToggle from "@/components/NotificationToggle";
-   // ... جوه الصفحة، وانتي عندك userId already:
-   <NotificationToggle userId={userId} />
+
 export default function ProfilePage() {
   const router = useRouter();
   const [userId, setUserId] = useState(null);
@@ -182,6 +181,9 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+
+      {/* إشعارات الطلبات */}
+      <NotificationToggle userId={userId} />
 
       {/* العناوين */}
       <section className="bg-white border border-[#EFE9E1] rounded-2xl p-4">
