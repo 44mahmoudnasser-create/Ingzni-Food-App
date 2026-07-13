@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/context/CartContext";
 import {
   Search, User, ClipboardList, Star, Plus, Minus, X,
-  ShoppingBag, Trash2, UtensilsCrossed,
+  ShoppingBag, Trash2, UtensilsCrossed, ShieldCheck,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -14,6 +14,7 @@ export default function HomePage() {
   const cart = useCart();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [restaurants, setRestaurants] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
@@ -31,8 +32,17 @@ export default function HomePage() {
   //    أو أيقونة البروفايل.
   // -------------------------------------------------
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setIsLoggedIn(!!data.user);
+      if (!data.user) return;
+
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", data.user.id)
+        .single();
+
+      setIsAdmin(!!userRow?.is_admin);
     });
   }, []);
 
@@ -122,6 +132,15 @@ export default function HomePage() {
               <ClipboardList size={16} />
               طلباتي
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => router.push("/admin")}
+                className="h-10 px-3.5 rounded-full bg-[#FFF1EB] flex items-center gap-1.5 text-[13px] font-bold font-[Cairo] text-[#FF6B35]"
+              >
+                <ShieldCheck size={16} />
+                لوحة التحكم
+              </button>
+            )}
           </div>
           <span className="font-[Cairo] font-extrabold text-[16px] text-[#FF6B35]">توصيل</span>
         </div>
