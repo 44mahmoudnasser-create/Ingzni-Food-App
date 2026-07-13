@@ -5,8 +5,9 @@ import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata = {
-  title: "توصيل | Delivery App",
-  description: "تطبيق توصيل الطعام",
+  title: "أنجزني",
+  description: "تطبيق أنجزني للتوصيل",
+  manifest: "/manifest.json", // السطر ده مهم جداً
 };
 
 export default function RootLayout({ children }) {
