@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "app.vercel.ingzni_food_app.twa",
-        "sha256_cert_fingerprints": ["BA:9E:B1:46:88:C8:3F:65:B2:07:96:84:DD:6A:EA:52:C7:87:10:38:31:71:23:92:71:01:5A:11:B0:04:94:A7"]
+        "sha256_cert_fingerprints": ["44:0F:CE:96:F0:B9:12:A4:F1:FA:8D:F5:80:6D:87:0A:28:F5:C0:07:45:5E:F3:38:A8:41:62:5A:3C:46:41:23"]
       }
     }]
