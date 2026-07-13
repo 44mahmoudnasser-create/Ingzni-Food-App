@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { ChevronRight, User, Phone, MapPin, Plus, Pencil, Trash2, LogOut, Check, X } from "lucide-react";
 import LocationPicker from "@/components/LocationPicker";
-
+import NotificationToggle from "@/components/NotificationToggle";
+   // ... جوه الصفحة، وانتي عندك userId already:
+   <NotificationToggle userId={userId} />
 export default function ProfilePage() {
   const router = useRouter();
   const [userId, setUserId] = useState(null);
