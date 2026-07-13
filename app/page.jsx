@@ -141,6 +141,20 @@ export default function HomePage() {
               <ClipboardList size={16} />
               طلباتي
             </button>
+            {/* زرار السلة (يظهر في الموبايل فقط) */}
+  <button
+    onClick={cart.openCart} // تأكد إن اسم الدالة دي صح وموجودة في الـ CartContext
+    className="lg:hidden h-10 px-3.5 rounded-full bg-[#FF6B35] text-white flex items-center gap-1.5 text-[13px] font-bold font-[Cairo]"
+  >
+    <ShoppingBag size={16} />
+    السلة
+    {cart.itemsCount > 0 && (
+      <span className="bg-white text-[#FF6B35] px-1.5 py-0.5 rounded-full text-[10px]">
+        {cart.itemsCount}
+      </span>
+    )}
+  </button>
+            
             {isAdmin && (
               <button
                 onClick={() => router.push("/admin")}
