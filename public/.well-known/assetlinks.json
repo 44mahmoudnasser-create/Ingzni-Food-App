@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.ingzni_food_app.twa",
+        "sha256_cert_fingerprints": ["BA:9E:B1:46:88:C8:3F:65:B2:07:96:84:DD:6A:EA:52:C7:87:10:38:31:71:23:92:71:01:5A:11:B0:04:94:A7"]
+      }
+    }]
