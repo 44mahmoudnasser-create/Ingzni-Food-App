@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useCart } from "@/context/CartContext";
 import {
   Search, User, ClipboardList, Star, Plus, Minus, X,
-  ShoppingBag, Trash2, UtensilsCrossed,
+  ShoppingBag, Trash2, UtensilsCrossed, ShieldCheck,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -14,6 +14,7 @@ export default function HomePage() {
   const cart = useCart();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [restaurants, setRestaurants] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
@@ -31,8 +32,17 @@ export default function HomePage() {
   //    أو أيقونة البروفايل.
   // -------------------------------------------------
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setIsLoggedIn(!!data.user);
+      if (!data.user) return;
+
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", data.user.id)
+        .single();
+
+      setIsAdmin(!!userRow?.is_admin);
     });
   }, []);
 
@@ -94,11 +104,20 @@ export default function HomePage() {
     setLoadingMenu(true);
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select("*, product_variants(*)")
       .eq("restaurant_id", restaurant.id)
       .eq("is_available", true);
 
-    if (!error) setMenuItems(data || []);
+    if (!error) {
+      // نعرض بس الأحجام المتاحة، مرتبة حسب sort_order
+      const withVariants = (data || []).map((p) => ({
+        ...p,
+        product_variants: (p.product_variants || [])
+          .filter((v) => v.is_available)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)),
+      }));
+      setMenuItems(withVariants);
+    }
     setLoadingMenu(false);
   };
 
@@ -122,6 +141,15 @@ export default function HomePage() {
               <ClipboardList size={16} />
               طلباتي
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => router.push("/admin")}
+                className="h-10 px-3.5 rounded-full bg-[#FFF1EB] flex items-center gap-1.5 text-[13px] font-bold font-[Cairo] text-[#FF6B35]"
+              >
+                <ShieldCheck size={16} />
+                لوحة التحكم
+              </button>
+            )}
           </div>
           <span className="font-[Cairo] font-extrabold text-[16px] text-[#FF6B35]">توصيل</span>
         </div>
@@ -193,16 +221,18 @@ export default function HomePage() {
           )}
         </main>
 
-        {/* الكارت الجانبي */}
-        <CartPanel
-          onCheckout={() => {
-            if (!isLoggedIn) {
-              router.push("/login?redirect=/checkout");
-            } else {
-              router.push("/checkout");
-            }
-          }}
-        />
+        {/* الكارت الجانبي — للشاشات الكبيرة بس، الموبايل بيستخدم درج السلة العام */}
+        <div className="hidden lg:block">
+          <CartPanel
+            onCheckout={() => {
+              if (!isLoggedIn) {
+                router.push("/login?redirect=/checkout");
+              } else {
+                router.push("/checkout");
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* مودال المنيو */}
@@ -222,8 +252,7 @@ export default function HomePage() {
    مودال قائمة الطعام لمطعم معين
 --------------------------------------------------- */
 function MenuModal({ restaurant, items, loading, onClose }) {
-  const { cart, addItem, incItem, decItem } = useCart();
-  const restaurantCart = cart[restaurant.id]?.items || {};
+  const { addItem, incItem, decItem, getQty } = useCart();
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#24201B]/40 px-0 sm:px-4">
@@ -242,36 +271,9 @@ function MenuModal({ restaurant, items, loading, onClose }) {
             <p className="text-[#8A8175] text-[13px] py-6">لا يوجد منتجات متاحة حاليًا.</p>
           ) : (
             <div className="divide-y divide-[#EFE9E1]">
-              {items.map((item) => {
-                const qty = restaurantCart[item.id]?.qty || 0;
-                return (
-                  <div key={item.id} className="flex items-center justify-between py-4">
-                    <div className="flex-1">
-                      <p className="font-bold font-[Cairo] text-[14px] text-[#24201B]">{item.name}</p>
-                      <p className="text-[12px] text-[#8A8175] mb-1 line-clamp-2">{item.description}</p>
-                      <p className="text-[13px] font-bold font-[JetBrains_Mono]">{Number(item.price).toLocaleString("ar-EG")} ج.م</p>
-                    </div>
-                    {qty === 0 ? (
-                      <button
-                        onClick={() => addItem(item, restaurant)}
-                        className="w-9 h-9 rounded-full bg-[#FF6B35] text-white flex items-center justify-center active:scale-90 transition"
-                      >
-                        <Plus size={18} />
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2 bg-[#FF6B35] rounded-full px-1 py-1">
-                        <button onClick={() => incItem(restaurant.id, item.id)} className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center">
-                          <Plus size={13} strokeWidth={3} />
-                        </button>
-                        <span className="text-white text-[12.5px] font-bold font-[JetBrains_Mono] min-w-[14px] text-center">{qty}</span>
-                        <button onClick={() => decItem(restaurant.id, item.id)} className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center">
-                          <Minus size={13} strokeWidth={3} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {items.map((item) => (
+                <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
+              ))}
             </div>
           )}
         </div>
@@ -285,6 +287,90 @@ function MenuModal({ restaurant, items, loading, onClose }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------
+   صف منتج واحد جوه مودال المنيو — لو المنتج ليه أحجام/أنواع، كل حجم
+   بيتعرض كصف مستقل بعداد +/- خاص بيه
+--------------------------------------------------- */
+function MenuItemRow({ item, restaurant }) {
+  const { addItem, incItem, decItem, getQty } = useCart();
+  const hasVariants = item.product_variants && item.product_variants.length > 0;
+
+  if (!hasVariants) {
+    const qty = getQty(restaurant.id, item, null);
+    return (
+      <div className="flex items-center justify-between py-4">
+        <div className="flex-1">
+          <p className="font-bold font-[Cairo] text-[14px] text-[#24201B]">{item.name}</p>
+          <p className="text-[12px] text-[#8A8175] mb-1 line-clamp-2">{item.description}</p>
+          <p className="text-[13px] font-bold font-[JetBrains_Mono]">{Number(item.price).toLocaleString("ar-EG")} ج.م</p>
+        </div>
+        <QtyControl
+          qty={qty}
+          onAdd={() => addItem(item, restaurant, null)}
+          onInc={() => incItem(restaurant.id, item.id)}
+          onDec={() => decItem(restaurant.id, item.id)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-4">
+      <p className="font-bold font-[Cairo] text-[14px] text-[#24201B]">{item.name}</p>
+      <p className="text-[12px] text-[#8A8175] mb-2.5 line-clamp-2">{item.description}</p>
+      <div className="space-y-2">
+        {item.product_variants.map((variant) => {
+          const qty = getQty(restaurant.id, item, variant);
+          return (
+            <div key={variant.id} className="flex items-center justify-between bg-[#FFFBF6] rounded-xl px-3 py-2">
+              <div>
+                <p className="text-[13px] font-semibold text-[#24201B]">{variant.name}</p>
+                <p className="text-[12.5px] font-bold font-[JetBrains_Mono] text-[#5C564C]">
+                  {Number(variant.price).toLocaleString("ar-EG")} ج.م
+                </p>
+              </div>
+              <QtyControl
+                qty={qty}
+                small
+                onAdd={() => addItem(item, restaurant, variant)}
+                onInc={() => incItem(restaurant.id, variant.id)}
+                onDec={() => decItem(restaurant.id, variant.id)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------
+   عداد +/- قابل لإعادة الاستخدام (لمنتج بسيط أو لحجم معين)
+--------------------------------------------------- */
+function QtyControl({ qty, onAdd, onInc, onDec, small = false }) {
+  if (qty === 0) {
+    return (
+      <button
+        onClick={onAdd}
+        className={`${small ? "w-8 h-8" : "w-9 h-9"} rounded-full bg-[#FF6B35] text-white flex items-center justify-center active:scale-90 transition shrink-0`}
+      >
+        <Plus size={small ? 15 : 18} />
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 bg-[#FF6B35] rounded-full px-1 py-1 shrink-0">
+      <button onClick={onInc} className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center">
+        <Plus size={13} strokeWidth={3} />
+      </button>
+      <span className="text-white text-[12.5px] font-bold font-[JetBrains_Mono] min-w-[14px] text-center">{qty}</span>
+      <button onClick={onDec} className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center">
+        <Minus size={13} strokeWidth={3} />
+      </button>
     </div>
   );
 }
@@ -317,15 +403,18 @@ function CartPanel({ onCheckout }) {
                   <Trash2 size={14} className="text-[#B0A99C]" />
                 </button>
               </div>
-              {so.items.map(({ product, qty }) => (
-                <div key={product.id} className="flex items-center justify-between py-1.5">
-                  <p className="text-[12.5px] text-[#5C564C]">{product.name}</p>
+              {so.items.map(({ itemKey, product, variant, qty }) => (
+                <div key={itemKey} className="flex items-center justify-between py-1.5">
+                  <p className="text-[12.5px] text-[#5C564C]">
+                    {product.name}
+                    {variant && <span className="text-[#B0A99C]"> — {variant.name}</span>}
+                  </p>
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => incItem(so.restaurant.id, product.id)} className="w-6 h-6 rounded-full bg-[#F4EFE6] flex items-center justify-center">
+                    <button onClick={() => incItem(so.restaurant.id, itemKey)} className="w-6 h-6 rounded-full bg-[#F4EFE6] flex items-center justify-center">
                       <Plus size={11} strokeWidth={3} />
                     </button>
                     <span className="text-[12px] font-bold font-[JetBrains_Mono] min-w-[12px] text-center">{qty}</span>
-                    <button onClick={() => decItem(so.restaurant.id, product.id)} className="w-6 h-6 rounded-full bg-[#F4EFE6] flex items-center justify-center">
+                    <button onClick={() => decItem(so.restaurant.id, itemKey)} className="w-6 h-6 rounded-full bg-[#F4EFE6] flex items-center justify-center">
                       <Minus size={11} strokeWidth={3} />
                     </button>
                   </div>
