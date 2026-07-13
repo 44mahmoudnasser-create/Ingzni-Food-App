@@ -221,16 +221,18 @@ export default function HomePage() {
           )}
         </main>
 
-        {/* الكارت الجانبي */}
-        <CartPanel
-          onCheckout={() => {
-            if (!isLoggedIn) {
-              router.push("/login?redirect=/checkout");
-            } else {
-              router.push("/checkout");
-            }
-          }}
-        />
+        {/* الكارت الجانبي — للشاشات الكبيرة بس، الموبايل بيستخدم درج السلة العام */}
+        <div className="hidden lg:block">
+          <CartPanel
+            onCheckout={() => {
+              if (!isLoggedIn) {
+                router.push("/login?redirect=/checkout");
+              } else {
+                router.push("/checkout");
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* مودال المنيو */}
