@@ -30,7 +30,9 @@ function getItemPrice(product, variant) {
 export function CartProvider({ children }) {
   const [cart, setCart] = useState({});
   const [hydrated, setHydrated] = useState(false);
-
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
   useEffect(() => {
     const saved = localStorage.getItem("cart");
     if (saved) {
@@ -173,6 +175,9 @@ export function CartProvider({ children }) {
     clearCart,
     getQty,
     getItemKey,
+    isCartOpen,   // ⬅️ جديد
+    openCart,     // ⬅️ جديد
+    closeCart,    // 
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
