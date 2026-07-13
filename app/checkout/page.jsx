@@ -306,7 +306,7 @@ export default function CheckoutPage() {
   if (loading) return <p className="text-center py-20 text-[#8A8175]">جاري التحميل...</p>;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
+    <div className="max-w-2xl mx-auto px-4 py-6 pb-40">
       <h1 className="font-[Cairo] font-extrabold text-[18px] text-[#24201B] mb-5">إتمام الطلب</h1>
 
       {/* العنوان */}
