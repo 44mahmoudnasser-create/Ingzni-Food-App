@@ -47,6 +47,13 @@ export default function AdminOrdersPage() {
   const updateOrderStatus = async (orderId, status) => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
     await supabase.from("orders").update({ status }).eq("id", orderId);
+
+    // نبلّغ العميل بإشعار push إن حالة الأوردر اتغيرت
+    fetch("/api/notify-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, status }),
+    }).catch((err) => console.error("notify-status failed:", err));
   };
 
   const updateSubOrderStatus = async (orderId, subOrderId, status) => {
