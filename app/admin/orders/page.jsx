@@ -31,7 +31,7 @@ export default function AdminOrdersPage() {
         sub_orders (
           id, status,
           restaurants ( name ),
-          order_items ( id, quantity, unit_price, notes, products ( name ) )
+          order_items ( id, quantity, unit_price, notes, variant_name, products ( name ) )
         )
       `)
       .order("created_at", { ascending: false });
@@ -176,7 +176,9 @@ export default function AdminOrdersPage() {
                         {so.order_items?.map((oi) => (
                           <div key={oi.id} className="mb-1">
                             <div className="flex justify-between text-[12px] font-[JetBrains_Mono] text-[#8A8175]">
-                              <span className="font-sans">{oi.products?.name} × {oi.quantity}</span>
+                              <span className="font-sans">
+                                {oi.products?.name}{oi.variant_name && ` — ${oi.variant_name}`} × {oi.quantity}
+                              </span>
                               <span>{(oi.unit_price * oi.quantity).toLocaleString("ar-EG")} ج.م</span>
                             </div>
                             {oi.notes && (
