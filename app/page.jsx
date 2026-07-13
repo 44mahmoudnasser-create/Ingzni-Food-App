@@ -106,7 +106,9 @@ export default function HomePage() {
       .from("products")
       .select("*, product_variants(*)")
       .eq("restaurant_id", restaurant.id)
-      .eq("is_available", true);
+      .eq("is_available", true)
+      .order("section", { ascending: true, nullsFirst: false })
+      .order("name", { ascending: true });
 
     if (!error) {
       // نعرض بس الأحجام المتاحة، مرتبة حسب sort_order
@@ -252,7 +254,34 @@ export default function HomePage() {
    مودال قائمة الطعام لمطعم معين
 --------------------------------------------------- */
 function MenuModal({ restaurant, items, loading, onClose }) {
-  const { addItem, incItem, decItem, getQty } = useCart();
+  const [query, setQuery] = useState("");
+
+  const visibleItems = useMemo(() => {
+    const term = query.trim();
+    if (term === "") return items;
+    return items.filter((i) => i.name.includes(term));
+  }, [items, query]);
+
+  // تجميع الأصناف حسب القسم (عمود section)، مع الحفاظ على ترتيب
+  // ظهور الأقسام زي ما هي جايه من الداتابيز (مش مرتبة أبجديًا عشوائي)
+  const sections = useMemo(() => {
+    const order = [];
+    const groups = {};
+    visibleItems.forEach((item) => {
+      const sectionName = item.section?.trim() || "أصناف أخرى";
+      if (!groups[sectionName]) {
+        groups[sectionName] = [];
+        order.push(sectionName);
+      }
+      groups[sectionName].push(item);
+    });
+    return order.map((name) => ({ name, items: groups[name] }));
+  }, [visibleItems]);
+
+  const scrollToSection = (sectionName) => {
+    const el = document.getElementById(`menu-section-${sectionName}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#24201B]/40 px-0 sm:px-4">
@@ -264,17 +293,52 @@ function MenuModal({ restaurant, items, loading, onClose }) {
           </button>
         </div>
 
+        {/* بحث داخل المنيو */}
+        <div className="px-5 pt-3">
+          <div className="relative">
+            <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A8175]" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="ابحث عن صنف في المنيو..."
+              className="w-full h-10 rounded-xl bg-[#FFFBF6] border border-[#EFE9E1] pr-9 pl-3 text-[13px] outline-none focus:border-[#FF6B35] transition"
+            />
+          </div>
+        </div>
+
+        {/* شرايط تنقّل سريع بين الأقسام — تظهر بس لو أكتر من قسم واحد */}
+        {sections.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto px-5 py-3 scrollbar-none">
+            {sections.map((s) => (
+              <button
+                key={s.name}
+                onClick={() => scrollToSection(s.name)}
+                className="shrink-0 px-3.5 py-1.5 rounded-full bg-[#F4EFE6] text-[#5C564C] text-[12px] font-bold font-[Cairo] whitespace-nowrap"
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-5">
           {loading ? (
             <p className="text-[#8A8175] text-[13px] py-6">جاري تحميل المنيو...</p>
-          ) : items.length === 0 ? (
-            <p className="text-[#8A8175] text-[13px] py-6">لا يوجد منتجات متاحة حاليًا.</p>
+          ) : visibleItems.length === 0 ? (
+            <p className="text-[#8A8175] text-[13px] py-6">لا يوجد أصناف مطابقة.</p>
           ) : (
-            <div className="divide-y divide-[#EFE9E1]">
-              {items.map((item) => (
-                <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
-              ))}
-            </div>
+            sections.map((s) => (
+              <div key={s.name} id={`menu-section-${s.name}`} className="scroll-mt-3">
+                <p className="text-[12.5px] font-bold font-[Cairo] text-[#FF6B35] bg-white sticky top-0 pt-3 pb-1.5 z-10">
+                  {s.name}
+                </p>
+                <div className="divide-y divide-[#EFE9E1]">
+                  {s.items.map((item) => (
+                    <MenuItemRow key={item.id} item={item} restaurant={restaurant} />
+                  ))}
+                </div>
+              </div>
+            ))
           )}
         </div>
 
