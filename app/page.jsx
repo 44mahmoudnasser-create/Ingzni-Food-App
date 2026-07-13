@@ -329,7 +329,7 @@ function MenuModal({ restaurant, items, loading, onClose }) {
           ) : (
             sections.map((s) => (
               <div key={s.name} id={`menu-section-${s.name}`} className="scroll-mt-3">
-                <p className="text-[12.5px] font-bold font-[Cairo] text-[#FF6B35] bg-white sticky top-0 pt-3 pb-1.5 z-10">
+                <p className="text-[17px] font-extrabold font-[Cairo] text-[#24201B] bg-white sticky top-0 pt-4 pb-2 z-10 border-b-2 border-[#FF6B35]/20">
                   {s.name}
                 </p>
                 <div className="divide-y divide-[#EFE9E1]">
