@@ -16,13 +16,13 @@ export default function CartDrawer() {
   const [editingNoteFor, setEditingNoteFor] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
 
-  const startEditNote = (restaurantId, product, note) => {
-    setEditingNoteFor(`${restaurantId}:${product.id}`);
+  const startEditNote = (restaurantId, itemKey, note) => {
+    setEditingNoteFor(`${restaurantId}:${itemKey}`);
     setNoteDraft(note || "");
   };
 
-  const saveNote = (restaurantId, productId) => {
-    updateNote(restaurantId, productId, noteDraft.trim());
+  const saveNote = (restaurantId, itemKey) => {
+    updateNote(restaurantId, itemKey, noteDraft.trim());
     setEditingNoteFor(null);
   };
 
@@ -42,12 +42,12 @@ export default function CartDrawer() {
   return (
     <>
       {isCartOpen && (
-  <div
-    onClick={closeCart}
-    data-cart-backdrop="true"
-    className="fixed inset-0 bg-[#24201B]/40 z-40"
-  />
-)}
+        <div
+          onClick={closeCart}
+          data-cart-backdrop="true"
+          className="fixed inset-0 bg-[#24201B]/40 z-40"
+        />
+      )}
       <div
         className={`fixed z-50 bg-white flex flex-col
         inset-x-0 bottom-0 max-h-[85vh] rounded-t-3xl
@@ -78,22 +78,25 @@ export default function CartDrawer() {
                       <Trash2 size={14} className="text-[#B0A99C]" />
                     </button>
                   </div>
-                  {so.items.map(({ product, qty, note }) => {
-                    const editKey = `${so.restaurant.id}:${product.id}`;
+                  {so.items.map(({ itemKey, product, variant, qty, note }) => {
+                    const editKey = `${so.restaurant.id}:${itemKey}`;
                     const isEditing = editingNoteFor === editKey;
                     return (
-                      <div key={product.id} className="py-1.5">
+                      <div key={itemKey} className="py-1.5">
                         <div className="flex items-center justify-between">
-                          <p className="text-[13px] text-[#5C564C]">{product.name}</p>
+                          <p className="text-[13px] text-[#5C564C]">
+                            {product.name}
+                            {variant && <span className="text-[#B0A99C]"> — {variant.name}</span>}
+                          </p>
                           <div className="flex items-center gap-1.5">
-                            <button onClick={() => startEditNote(so.restaurant.id, product, note)} className="text-[#B0A99C]" aria-label="ملاحظة على الصنف">
+                            <button onClick={() => startEditNote(so.restaurant.id, itemKey, note)} className="text-[#B0A99C]" aria-label="ملاحظة على الصنف">
                               <Pencil size={11} />
                             </button>
-                            <button onClick={() => incItem(so.restaurant.id, product.id)} className="w-7 h-7 rounded-full bg-[#F4EFE6] flex items-center justify-center">
+                            <button onClick={() => incItem(so.restaurant.id, itemKey)} className="w-7 h-7 rounded-full bg-[#F4EFE6] flex items-center justify-center">
                               <Plus size={12} strokeWidth={3} />
                             </button>
                             <span className="text-[12.5px] font-bold font-[JetBrains_Mono] min-w-[14px] text-center">{qty}</span>
-                            <button onClick={() => decItem(so.restaurant.id, product.id)} className="w-7 h-7 rounded-full bg-[#F4EFE6] flex items-center justify-center">
+                            <button onClick={() => decItem(so.restaurant.id, itemKey)} className="w-7 h-7 rounded-full bg-[#F4EFE6] flex items-center justify-center">
                               <Minus size={12} strokeWidth={3} />
                             </button>
                           </div>
@@ -107,7 +110,7 @@ export default function CartDrawer() {
                               placeholder="ملاحظة على الصنف..."
                               className="flex-1 h-8 rounded-lg border border-[#EFE9E1] px-2 text-[11.5px] outline-none focus:border-[#FF6B35]"
                             />
-                            <button onClick={() => saveNote(so.restaurant.id, product.id)} className="px-2.5 h-8 rounded-lg bg-[#FF6B35] text-white text-[11px] font-bold">حفظ</button>
+                            <button onClick={() => saveNote(so.restaurant.id, itemKey)} className="px-2.5 h-8 rounded-lg bg-[#FF6B35] text-white text-[11px] font-bold">حفظ</button>
                           </div>
                         )}
                       </div>
