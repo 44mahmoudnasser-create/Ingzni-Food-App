@@ -7,6 +7,7 @@ import { Wallet, ChevronDown, ArrowUpCircle, ArrowDownCircle } from "lucide-reac
 const TYPE_LABELS = {
   topup: "شحن رصيد",
   refund_change: "فرق مسترجع",
+  refund_cancelled: "استرجاع من طلب ملغي",
   order_payment: "دفع طلب",
   admin_adjustment: "تعديل من الإدارة",
 };
