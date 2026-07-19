@@ -23,7 +23,7 @@ export default function AdminOrdersPage() {
     const { data, error } = await supabase
       .from("orders")
       .select(`
-        id, total_amount, delivery_fee, payment_method, status, created_at,
+        id, total_amount, delivery_fee, payment_method, wallet_amount_paid, status, created_at,
         notes, estimated_delivery_minutes, rating, rating_comment,
         route_distance_km, route_maps_url,
         users ( name, phone_number ),
@@ -202,6 +202,23 @@ export default function AdminOrdersPage() {
                       <span>الإجمالي</span>
                       <span>{Number(order.total_amount).toLocaleString("ar-EG")} ج.م</span>
                     </div>
+
+                    {order.payment_method === "wallet" && (
+                      <div className="flex justify-between text-[12px] font-[JetBrains_Mono] mb-2 bg-[#FFFBF6] rounded-lg px-2.5 py-1.5">
+                        <span className="text-[#8A8175]">مدفوع من المحفظة</span>
+                        <span className="text-[#166248] font-bold">{Number(order.wallet_amount_paid).toLocaleString("ar-EG")} ج.م</span>
+                      </div>
+                    )}
+
+                    {order.payment_method === "wallet" &&
+                      Number(order.total_amount) - Number(order.wallet_amount_paid) > 0 && (
+                        <div className="flex justify-between text-[12.5px] font-bold font-[JetBrains_Mono] mb-2 bg-[#FEF3E2] rounded-lg px-2.5 py-1.5">
+                          <span className="text-[#8A5A0A]">المطلوب تحصيله كاش</span>
+                          <span className="text-[#8A5A0A]">
+                            {(Number(order.total_amount) - Number(order.wallet_amount_paid)).toLocaleString("ar-EG")} ج.م
+                          </span>
+                        </div>
+                      )}
 
                     {order.rating && (
                       <p className="text-[12px] text-[#8A8175] mb-2">
