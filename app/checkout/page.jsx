@@ -73,6 +73,7 @@ export default function CheckoutPage() {
   const [addresses, setAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [payment, setPayment] = useState("cash");
+  const [walletBalance, setWalletBalance] = useState(0);
   const [orderNote, setOrderNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
@@ -95,6 +96,13 @@ export default function CheckoutPage() {
         return;
       }
       setUserId(userData.user.id);
+
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("wallet_balance")
+        .eq("id", userData.user.id)
+        .single();
+      setWalletBalance(userRow?.wallet_balance || 0);
 
       const { data: addressData, error: addrErr } = await supabase
         .from("addresses")
@@ -229,6 +237,10 @@ export default function CheckoutPage() {
       setError("اختار عنوان التوصيل الأول.");
       return;
     }
+    if (payment === "wallet" && walletBalance < total) {
+      setError("رصيد المحفظة مش كفاية لدفع الطلب ده.");
+      return;
+    }
     setError("");
     setPlacing(true);
 
@@ -259,6 +271,26 @@ export default function CheckoutPage() {
       setError("حصل خطأ أثناء إنشاء الطلب: " + orderErr.message);
       setPlacing(false);
       return;
+    }
+
+    // لو الدفع بالمحفظة، نخصم المبلغ دلوقتي عن طريق دالة آمنة في
+    // السيرفر بتتأكد من الرصيد وقت التنفيذ نفسه (تمنع أي تضارب لو
+    // حصل أكتر من طلب في نفس اللحظة)
+    if (payment === "wallet") {
+      const { error: walletErr } = await supabase.rpc("spend_from_wallet", {
+        p_amount: total,
+        p_order_id: order.id,
+        p_description: `دفع الطلب #${order.id.slice(0, 8)}`,
+      });
+
+      if (walletErr) {
+        // فشل الخصم (مثلاً الرصيد مبقاش كفاية) — نلغي الأوردر اللي
+        // اتعمل لتوه عشان منسيبش أوردر معلق من غير دفع فعلي
+        await supabase.from("orders").delete().eq("id", order.id);
+        setError("تعذر الدفع من المحفظة: " + walletErr.message);
+        setPlacing(false);
+        return;
+      }
     }
 
     // 2) إنشاء طلب فرعي لكل مطعم + عناصره
@@ -306,7 +338,7 @@ export default function CheckoutPage() {
   if (loading) return <p className="text-center py-20 text-[#8A8175]">جاري التحميل...</p>;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-40">
+    <div className="max-w-2xl mx-auto px-4 py-6 pb-28">
       <h1 className="font-[Cairo] font-extrabold text-[18px] text-[#24201B] mb-5">إتمام الطلب</h1>
 
       {/* العنوان */}
@@ -358,6 +390,11 @@ export default function CheckoutPage() {
               <span className="flex items-center gap-2.5 text-[13.5px] font-semibold font-[Cairo] text-[#24201B]">
                 <p.icon size={16} className={payment === p.id ? "text-[#FF6B35]" : "text-[#8A8175]"} />
                 {p.label}
+                {p.id === "wallet" && (
+                  <span className="text-[11px] font-normal text-[#8A8175]">
+                    (رصيدك: {Number(walletBalance).toLocaleString("ar-EG")} ج.م)
+                  </span>
+                )}
               </span>
               <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${payment === p.id ? "border-[#FF6B35]" : "border-[#D8CFC0]"}`}>
                 {payment === p.id && <span className="w-2.5 h-2.5 rounded-full bg-[#FF6B35]" />}
@@ -365,6 +402,11 @@ export default function CheckoutPage() {
             </button>
           ))}
         </div>
+        {payment === "wallet" && walletBalance < total && (
+          <p className="text-[12px] text-[#A32D2D] mt-2.5">
+            رصيدك مش كفاية لدفع الطلب ده، اختاري طريقة دفع تانية أو قلّلي الطلب.
+          </p>
+        )}
       </section>
 
       {/* ملخص الطلب مقسم بالمطاعم */}
@@ -444,9 +486,10 @@ export default function CheckoutPage() {
 
       {error && <p className="text-[#A32D2D] text-[13px] mt-4">{error}</p>}
 
-    <div className="fixed bottom-20 inset-x-0 px-4">        <button
+      <div className="fixed bottom-4 inset-x-0 px-4">
+        <button
           onClick={handlePlaceOrder}
-          disabled={placing || !selectedAddressId}
+          disabled={placing || !selectedAddressId || (payment === "wallet" && walletBalance < total)}
           className="max-w-2xl mx-auto w-full h-[52px] rounded-2xl bg-[#FF6B35] disabled:opacity-60 text-white font-bold font-[Cairo] text-[15px] flex items-center justify-center gap-2 transition"
         >
           {placing && <Loader2 size={18} className="animate-spin" />}
