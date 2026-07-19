@@ -222,6 +222,12 @@ export default function CheckoutPage() {
 
   const total = subtotal + deliveryFee;
 
+  // المبلغ اللي هيتخصم فعليًا من المحفظة (لو الدفع بالمحفظة)، والباقي
+  // اللي العميل لازم يدفعه كاش لو الرصيد مش كافي. ده اللي هيتعرض
+  // للعميل بدل الإجمالي الخام عشان ميتلغبطش.
+  const walletAmountToPay = payment === "wallet" ? Math.min(walletBalance, total) : 0;
+  const cashDue = total - walletAmountToPay;
+
   // الوقت التقريبي للتوصيل: وقت التجهيز + وقت الانتقال الحقيقي من جوجل
   // (أو الـ fallback التقريبي لو المسار الحقيقي مش متاح)
   const estimatedMinutes = route
@@ -244,7 +250,7 @@ export default function CheckoutPage() {
     // الرصيد أقل من قيمة الطلب، بنخصم اللي متاح بس والباقي (cash
     // مستحق) هيحصّله المندوب كاش وقت التسليم. لو الرصيد يغطي الطلب
     // بالكامل، هيتخصم كله ومفيش حاجة كاش.
-    const walletAmountToPay = payment === "wallet" ? Math.min(walletBalance, total) : 0;
+    // (walletAmountToPay محسوبة فوق على مستوى الكومبوننت)
 
     // 1) إنشاء الطلب الرئيسي
     const { data: order, error: orderErr } = await supabase
@@ -454,6 +460,18 @@ export default function CheckoutPage() {
             </div>
           )}
           <div className="flex justify-between text-[#24201B] font-bold text-[15px] pt-1.5 border-t border-[#EFE9E1]"><span>الإجمالي</span><span>{total.toLocaleString("ar-EG")} ج.م</span></div>
+          {payment === "wallet" && walletAmountToPay > 0 && (
+            <div className="flex justify-between text-[#166248]">
+              <span>مدفوع من المحفظة</span>
+              <span>- {walletAmountToPay.toLocaleString("ar-EG")} ج.م</span>
+            </div>
+          )}
+          {payment === "wallet" && (
+            <div className="flex justify-between text-[#24201B] font-bold text-[16px] pt-1.5 border-t border-dashed border-[#EFE9E1]">
+              <span>{cashDue > 0 ? "المطلوب دفعه كاش" : "المطلوب دفعه"}</span>
+              <span>{cashDue.toLocaleString("ar-EG")} ج.م</span>
+            </div>
+          )}
         </div>
         {estimatedMinutes && (
           <div className="flex items-center gap-1.5 text-[12.5px] text-[#5C564C] mt-3 pt-3 border-t border-dashed border-[#EFE9E1]">
@@ -499,7 +517,10 @@ export default function CheckoutPage() {
           className="max-w-2xl mx-auto w-full h-[52px] rounded-2xl bg-[#FF6B35] disabled:opacity-60 text-white font-bold font-[Cairo] text-[15px] flex items-center justify-center gap-2 transition"
         >
           {placing && <Loader2 size={18} className="animate-spin" />}
-          تأكيد الطلب · {total.toLocaleString("ar-EG")} ج.م
+          تأكيد الطلب · {(payment === "wallet" ? cashDue : total).toLocaleString("ar-EG")} ج.م
+          {payment === "wallet" && cashDue < total && (
+            <span className="text-[11px] font-normal opacity-90"> (كاش)</span>
+          )}
         </button>
       </div>
     </div>
