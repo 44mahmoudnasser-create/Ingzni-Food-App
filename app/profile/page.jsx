@@ -184,7 +184,7 @@ export default function ProfilePage() {
 
       {/* إشعارات الطلبات */}
       <NotificationToggle userId={userId} />
-
+<WalletBalance userId={userId} />
       {/* العناوين */}
       <section className="bg-white border border-[#EFE9E1] rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
