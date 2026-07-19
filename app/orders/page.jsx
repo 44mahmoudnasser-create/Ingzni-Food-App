@@ -32,7 +32,7 @@ export default function OrdersPage() {
       const { data, error } = await supabase
         .from("orders")
         .select(`
-          id, total_amount, delivery_fee, payment_method, status, created_at,
+          id, total_amount, delivery_fee, payment_method, wallet_amount_paid, status, created_at,
           notes, estimated_delivery_minutes, rating, rating_comment,
           route_distance_km, route_maps_url,
           sub_orders (
@@ -146,10 +146,29 @@ export default function OrdersPage() {
                       </p>
                     )}
 
-                    <div className="flex justify-between text-[13px] font-bold text-[#24201B] pt-2 border-t border-[#EFE9E1] font-[JetBrains_Mono] mb-3">
+                    <div className="flex justify-between text-[13px] font-bold text-[#24201B] pt-2 border-t border-[#EFE9E1] font-[JetBrains_Mono]">
                       <span>الإجمالي</span>
                       <span>{Number(order.total_amount).toLocaleString("ar-EG")} ج.م</span>
                     </div>
+
+                    {order.payment_method === "wallet" && Number(order.wallet_amount_paid) > 0 && (
+                      <div className="flex justify-between text-[12px] font-[JetBrains_Mono] text-[#166248] mt-1">
+                        <span>مدفوع من المحفظة</span>
+                        <span>- {Number(order.wallet_amount_paid).toLocaleString("ar-EG")} ج.م</span>
+                      </div>
+                    )}
+
+                    {order.payment_method === "wallet" && (
+                      <div className="flex justify-between text-[13px] font-bold font-[JetBrains_Mono] text-[#24201B] mt-1 pt-1 border-t border-dashed border-[#EFE9E1] mb-3">
+                        <span>
+                          {Number(order.total_amount) - Number(order.wallet_amount_paid) > 0 ? "المطلوب/كان مطلوب كاش" : "المطلوب دفعه"}
+                        </span>
+                        <span>
+                          {(Number(order.total_amount) - Number(order.wallet_amount_paid)).toLocaleString("ar-EG")} ج.م
+                        </span>
+                      </div>
+                    )}
+                    {order.payment_method !== "wallet" && <div className="mb-3" />}
 
                     {order.route_maps_url && (
                       <a
