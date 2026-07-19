@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ChevronRight, User, Phone, MapPin, Plus, Pencil, Trash2, LogOut, Check, X } from "lucide-react";
 import LocationPicker from "@/components/LocationPicker";
 import NotificationToggle from "@/components/NotificationToggle";
+import WalletBalance from "@/components/WalletBalance";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -184,7 +185,8 @@ export default function ProfilePage() {
 
       {/* إشعارات الطلبات */}
       <NotificationToggle userId={userId} />
-<WalletBalance userId={userId} />
+      <WalletBalance userId={userId} />
+
       {/* العناوين */}
       <section className="bg-white border border-[#EFE9E1] rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
