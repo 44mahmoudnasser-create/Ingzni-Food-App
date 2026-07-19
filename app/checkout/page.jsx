@@ -237,12 +237,14 @@ export default function CheckoutPage() {
       setError("اختار عنوان التوصيل الأول.");
       return;
     }
-    if (payment === "wallet" && walletBalance < total) {
-      setError("رصيد المحفظة مش كفاية لدفع الطلب ده.");
-      return;
-    }
     setError("");
     setPlacing(true);
+
+    // لو الدفع بالمحفظة، بنخصم أكبر مبلغ ممكن من الرصيد المتاح — لو
+    // الرصيد أقل من قيمة الطلب، بنخصم اللي متاح بس والباقي (cash
+    // مستحق) هيحصّله المندوب كاش وقت التسليم. لو الرصيد يغطي الطلب
+    // بالكامل، هيتخصم كله ومفيش حاجة كاش.
+    const walletAmountToPay = payment === "wallet" ? Math.min(walletBalance, total) : 0;
 
     // 1) إنشاء الطلب الرئيسي
     const { data: order, error: orderErr } = await supabase
@@ -253,6 +255,7 @@ export default function CheckoutPage() {
         total_amount: total,
         delivery_fee: deliveryFee,
         payment_method: payment,
+        wallet_amount_paid: walletAmountToPay,
         notes: orderNote.trim() || null,
         estimated_delivery_minutes: estimatedMinutes,
         // بيانات المسار الفعلي من جوجل (لو اتحسب)، عشان نحتفظ بيه مع
@@ -273,19 +276,20 @@ export default function CheckoutPage() {
       return;
     }
 
-    // لو الدفع بالمحفظة، نخصم المبلغ دلوقتي عن طريق دالة آمنة في
-    // السيرفر بتتأكد من الرصيد وقت التنفيذ نفسه (تمنع أي تضارب لو
-    // حصل أكتر من طلب في نفس اللحظة)
-    if (payment === "wallet") {
+    // نخصم المبلغ فعليًا عن طريق دالة آمنة في السيرفر بتتأكد من الرصيد
+    // وقت التنفيذ نفسه (تمنع أي تضارب لو حصل أكتر من طلب في نفس
+    // اللحظة). لو مفيش حاجة تتخصم (رصيد صفر أو الدفع مش بالمحفظة)،
+    // منعملش النداء أصلاً.
+    if (walletAmountToPay > 0) {
       const { error: walletErr } = await supabase.rpc("spend_from_wallet", {
-        p_amount: total,
+        p_amount: walletAmountToPay,
         p_order_id: order.id,
         p_description: `دفع الطلب #${order.id.slice(0, 8)}`,
       });
 
       if (walletErr) {
-        // فشل الخصم (مثلاً الرصيد مبقاش كفاية) — نلغي الأوردر اللي
-        // اتعمل لتوه عشان منسيبش أوردر معلق من غير دفع فعلي
+        // فشل الخصم (مثلاً حصل تضارب رصيد) — نلغي الأوردر اللي اتعمل
+        // لتوه عشان منسيبش أوردر معلق من غير دفع فعلي
         await supabase.from("orders").delete().eq("id", order.id);
         setError("تعذر الدفع من المحفظة: " + walletErr.message);
         setPlacing(false);
@@ -403,8 +407,10 @@ export default function CheckoutPage() {
           ))}
         </div>
         {payment === "wallet" && walletBalance < total && (
-          <p className="text-[12px] text-[#A32D2D] mt-2.5">
-            رصيدك مش كفاية لدفع الطلب ده، اختاري طريقة دفع تانية أو قلّلي الطلب.
+          <p className="text-[12px] text-[#8A5A0A] bg-[#FEF3E2] rounded-lg px-2.5 py-2 mt-2.5">
+            هيتخصم {Math.min(walletBalance, total).toLocaleString("ar-EG")} ج.م من محفظتك،
+            والباقي ({(total - Math.min(walletBalance, total)).toLocaleString("ar-EG")} ج.م) هتدفعه
+            كاش للمندوب وقت التسليم.
           </p>
         )}
       </section>
@@ -489,7 +495,7 @@ export default function CheckoutPage() {
       <div className="fixed bottom-4 inset-x-0 px-4">
         <button
           onClick={handlePlaceOrder}
-          disabled={placing || !selectedAddressId || (payment === "wallet" && walletBalance < total)}
+          disabled={placing || !selectedAddressId}
           className="max-w-2xl mx-auto w-full h-[52px] rounded-2xl bg-[#FF6B35] disabled:opacity-60 text-white font-bold font-[Cairo] text-[15px] flex items-center justify-center gap-2 transition"
         >
           {placing && <Loader2 size={18} className="animate-spin" />}
